@@ -1,26 +1,88 @@
+// gpio_servo_softpwm.rs - Rotates a servo using software-based PWM.
+//
+// Calibrate your servo beforehand, and change the values listed below to fall
+// within your servo's safe limits to prevent potential damage. Don't power the
+// servo directly from the Pi's GPIO header. Current spikes during power-up and
+// stalls could otherwise damage your Pi, or cause your Pi to spontaneously
+// reboot, corrupting your microSD card. If you're powering the servo using a
+// separate power supply, remember to connect the grounds of the Pi and the
+// power supply together.
+//
+// Software-based PWM is inherently inaccurate on a multi-threaded OS due to
+// scheduling/preemption. If an accurate or faster PWM signal is required, use
+// the hardware PWM peripheral instead. Check out the pwm_servo.rs example to
+// learn how to control a servo using hardware PWM.
+
 use std::error::Error;
 use std::thread;
 use std::time::Duration;
 
 use rppal::gpio::Gpio;
-use rppal::system::DeviceInfo;
-use rppal::i2c::I2c;
-use rppal::pwm::{Channel, Pwm};
-use rppal::spi::{Bus, Mode, SlaveSelect, Spi};
-use rppal::uart::{Parity, Uart};
 
 // Gpio uses BCM pin numbering. BCM GPIO 23 is tied to physical pin 16.
-const GPIO_LED: u8 = 23;
+// links = 27
+// rechts = 17
+const GPIO_PWM: u8 = 22;
+const GPIO_PWM2: u8 = 17;
+
+// Servo configuration. Change these values based on your servo's verified safe
+// minimum and maximum values.
+//
+// Period: 20 ms (50 Hz). Pulse width: min. 1200 µs, neutral 1500 µs, max. 1800 µs.
+const PERIOD_MS: u64 = 10;
+const PULSE_MIN_US: u64 = 1000;
+const PULSE_NEUTRAL_US: u64 = 1500;
+const PULSE_MAX_US: u64 = 2000;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    println!("Blinking an LED on a {}.", DeviceInfo::new()?.model());
+    // Retrieve the GPIO pin and configure it as an output.
+    let mut pin = Gpio::new()?.get(GPIO_PWM)?.into_output();
+    let mut pin2 = Gpio::new()?.get(GPIO_PWM2)?.into_output();
+    // Enable software-based PWM with the specified period, and rotate the servo by
+    // setting the pulse width to its maximum value.
+    // linker motor maximale snelheid.
+    pin.set_pwm(
+        Duration::from_millis(PERIOD_MS),
+        Duration::from_micros(PULSE_MAX_US),
+    )?;
+    // rechter motor maximale snelheid.
+    pin2.set_pwm(
+        Duration::from_millis(PERIOD_MS),
+        Duration::from_micros(PULSE_MAX_US),
+    )?;
 
-    let mut pin = Gpio::new()?.get(GPIO_LED)?.into_output();
-
-    // Blink the LED by setting the pin's logic level high for 500 ms.
-    pin.set_high();
+    // Sleep for 500 ms while the servo moves into position.
     thread::sleep(Duration::from_millis(500));
-    pin.set_low();
+
+    // Rotate the servo to the opposite side.
+    pin.set_pwm(
+        Duration::from_millis(PERIOD_MS),
+        Duration::from_micros(PULSE_MIN_US),
+    )?;
+
+    pin2.set_pwm(
+        Duration::from_millis(PERIOD_MS),
+        Duration::from_micros(PULSE_MIN_US),
+    )?;
+
+    thread::sleep(Duration::from_millis(500));
+
+    // Rotate the servo to its neutral (center) position in small steps.
+    for pulse in (PULSE_MIN_US..=PULSE_NEUTRAL_US).step_by(10) {
+        pin.set_pwm(
+            Duration::from_millis(PERIOD_MS),
+            Duration::from_micros(pulse),
+        )?;
+        pin2.set_pwm(
+            Duration::from_millis(PERIOD_MS),
+            Duration::from_micros(pulse),
+        )?;
+        thread::sleep(Duration::from_millis(20));
+
+    }
 
     Ok(())
+
+    // When the pin variable goes out of scope, software-based PWM is automatically disabled.
+    // You can manually disable PWM by calling the clear_pwm() method.
 }
