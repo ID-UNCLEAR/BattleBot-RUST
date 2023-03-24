@@ -18,6 +18,7 @@ use std::thread;
 use std::time::Duration;
 
 use rppal::gpio::Gpio;
+use rppal::gpio::OutputPin;
 
 // Gpio uses BCM pin numbering. BCM GPIO 23 is tied to physical pin 16.
 // links = 27
@@ -36,8 +37,8 @@ const PULSE_MAX_US: u64 = 2000;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Retrieve the GPIO pin and configure it as an output.
-    let mut pin = Gpio::new()?.get(GPIO_PWM)?.into_output();
-    let mut pin2 = Gpio::new()?.get(GPIO_PWM2)?.into_output();
+    let mut pin: OutputPin = Gpio::new()?.get(GPIO_PWM)?.into_output();
+    let mut pin2: OutputPin = Gpio::new()?.get(GPIO_PWM2)?.into_output();
     // Enable software-based PWM with the specified period, and rotate the servo by
     // setting the pulse width to its maximum value.
     // linker motor maximale snelheid.
