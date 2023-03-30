@@ -1,61 +1,113 @@
-// gpio_servo_softpwm.rs - Rotates a servo using software-based PWM.
-//
-// Calibrate your servo beforehand, and change the values listed below to fall
-// within your servo's safe limits to prevent potential damage. Don't power the
-// servo directly from the Pi's GPIO header. Current spikes during power-up and
-// stalls could otherwise damage your Pi, or cause your Pi to spontaneously
-// reboot, corrupting your microSD card. If you're powering the servo using a
-// separate power supply, remember to connect the grounds of the Pi and the
-// power supply together.
-//
-// Software-based PWM is inherently inaccurate on a multi-threaded OS due to
-// scheduling/preemption. If an accurate or faster PWM signal is required, use
-// the hardware PWM peripheral instead. Check out the pwm_servo.rs example to
-// learn how to control a servo using hardware PWM.
+// Main Rust file voor de battlebot.
+// Version: 0.1
 
+
+//------------------------------
+// Main Rust crate
+//------------------------------
 use std::error::Error;
 use std::thread;
 use std::time::Duration;
+use std::io::{stdin, stdout, Read, Stdin, Write};
 
-use rppal::gpio::Gpio;
-use rppal::gpio::OutputPin;
+//------------------------------
+// Rppal crate
+//------------------------------
+use rppal::gpio::{Gpio, Result, Pin, OutputPin};
 
-// Gpio uses BCM pin numbering. BCM GPIO 23 is tied to physical pin 16.
-// links = 27
-// rechts = 17
-const GPIO_PWM: u8 = 22;
-const GPIO_PWM2: u8 = 17;
+//------------------------------
+// Termion crate
+//------------------------------
+use termion::event::Key;
+use termion::input::TermRead;
+use termion::raw::IntoRawMode;
 
-// Servo configuration. Change these values based on your servo's verified safe
-// minimum and maximum values.
-//
-// Period: 20 ms (50 Hz). Pulse width: min. 1200 µs, neutral 1500 µs, max. 1800 µs.
-const PERIOD_MS: u64 = 10;
-const PULSE_MIN_US: u64 = 1000;
-const PULSE_NEUTRAL_US: u64 = 1500;
-const PULSE_MAX_US: u64 = 2000;
+//------------------------------
+// Constants
+//------------------------------
+const GPIO_PWM0: u8 = 22; // Fysieke pin:
+const GPIO_PWM1: u8 = 27; // Fysieke pin: 
 
-fn main() -> Result<(), Box<dyn Error>> {
-    // Retrieve the GPIO pin and configure it as an output.
-    let mut pin: OutputPin = Gpio::new()?.get(GPIO_PWM)?.into_output();
-    let mut pin2: OutputPin = Gpio::new()?.get(GPIO_PWM2)?.into_output();
-    // Enable software-based PWM with the specified period, and rotate the servo by
-    // setting the pulse width to its maximum value.
-    // linker motor maximale snelheid.
-    pin.set_pwm(
-        Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(PULSE_MAX_US),
-    )?;
-    // rechter motor maximale snelheid.
-    pin2.set_pwm(
-        Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(PULSE_MAX_US),
-    )?;
+// Servo configuratie: 
+// !important: niet aanpassen.
+const PERIOD_MS: u64 = 10; // Periode: 100 Hz.
+const PULSE_MIN_US: u64 = 1000; // Pulse width min. 1000 µs (1000 microseconden)
+const PULSE_NEUTRAL_US: u64 = 1500; // Pulse width neutraal. 1500 µs (1500 microseconden)
+const PULSE_MAX_US: u64 = 2000; // Pulse width max. 2000 µs (2000 microseconden)
 
-    // Sleep for 500 ms while the servo moves into position.
-    thread::sleep(Duration::from_millis(500));
+fn main() {
+    let stdin = stdin();
+    let mut stdout = stdout().into_raw_mode().unwrap();
 
-    // Rotate the servo to the opposite side.
+    write!(stdout, r#"{}{} Druk op Esc om af te sluiten."#, termion::cursor::Goto(1, 1), termion::clear::All).unwrap();
+    stdout.flush().unwrap();
+
+    for character in stdin.keys() {
+        //clearing the screen and going to top left corner
+        write!(
+            stdout,
+            "{}{}",
+            termion::cursor::Goto(1, 1),
+            termion::clear::All
+        )
+        .unwrap();
+        match character.unwrap() {
+            Key::Char('w') => {
+                println!("W: Versnellen!");
+                accelerate().unwrap();
+            },
+            Key::Char('s') => {
+                println!("S: Afremmen!");
+                deaccelerate().unwrap();
+            },
+            Key::Char('a') => {
+                println!("A: Naar links!");
+                turn_left().unwrap();
+            },
+            Key::Char('d') => {
+                println!("D: Naar rechts!");
+                turn_right().unwrap();
+            },
+            Key::Alt('w') => {
+                println!("W: Überhard naar voor!");
+
+            },
+            Key::Alt('s') => {
+                println!("W: Überhard naar achter!");
+
+            },
+            Key::Alt('a') => {
+                println!("A: Überhard naar links!");
+
+            },
+            Key::Alt('d') => {
+                println!("D: Überhard naar rechts!");
+
+            },
+            Key::Esc => {
+                write!(
+                    stdout,
+                    "{}{}",
+                    termion::cursor::Goto(1, 1),
+                    termion::clear::All
+                ).unwrap();
+                println!("Escaped the Matrix!");
+                turn_neutral().expect("Kon niet naar standaard!");
+                break;
+            },
+            _ => {
+                println!("Druk op Esc om af te sluiten.");
+            },
+        }
+        stdout.flush().unwrap();
+    }
+}
+
+fn accelerate() -> std::result::Result<(), Box<dyn Error>> {    // Retrieve the GPIO pin and configure it as an output.
+
+    let mut pin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
+    let mut pin2 = Gpio::new()?.get(GPIO_PWM1)?.into_output();
+
     pin.set_pwm(
         Duration::from_millis(PERIOD_MS),
         Duration::from_micros(PULSE_MIN_US),
@@ -66,24 +118,88 @@ fn main() -> Result<(), Box<dyn Error>> {
         Duration::from_micros(PULSE_MIN_US),
     )?;
 
-    thread::sleep(Duration::from_millis(500));
+    thread::sleep(Duration::from_millis(25));
 
-    // Rotate the servo to its neutral (center) position in small steps.
+    Ok(())
+}
+
+fn deaccelerate() -> std::result::Result<(), Box<dyn Error>>  {
+    let mut pin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
+    let mut pin2 = Gpio::new()?.get(GPIO_PWM1)?.into_output();
+
+    pin.set_pwm(
+        Duration::from_millis(PERIOD_MS),
+        Duration::from_micros(PULSE_MAX_US),
+    )?;
+
+    pin2.set_pwm(
+        Duration::from_millis(PERIOD_MS),
+        Duration::from_micros(PULSE_MAX_US),
+    )?;
+
+    thread::sleep(Duration::from_millis(25));
+
+    Ok(())
+}
+
+fn turn_left() -> std::result::Result<(), Box<dyn Error>> {
+    let mut pin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
+    let mut pin2 = Gpio::new()?.get(GPIO_PWM1)?.into_output();
+
+    pin.set_low();
+    pin2.set_low();
+
+    pin.set_pwm(
+        Duration::from_millis(PERIOD_MS),
+        Duration::from_micros(PULSE_MIN_US),
+    )?;
+
+    pin2.set_pwm(
+        Duration::from_millis(PERIOD_MS),
+        Duration::from_micros(PULSE_MAX_US),
+    )?;
+
+    thread::sleep(Duration::from_millis(25));
+
+    Ok(())
+}
+
+fn turn_right() -> std::result::Result<(), Box<dyn Error>> {
+    let mut pin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
+    let mut pin2 = Gpio::new()?.get(GPIO_PWM1)?.into_output();
+
+    pin.set_low();
+    pin2.set_low();
+
+    pin.set_pwm(
+        Duration::from_millis(PERIOD_MS),
+        Duration::from_micros(PULSE_MAX_US),
+    )?;
+
+    pin2.set_pwm(
+        Duration::from_millis(PERIOD_MS),
+        Duration::from_micros(PULSE_MIN_US),
+    )?;
+
+    thread::sleep(Duration::from_millis(25));
+
+    Ok(())
+}
+
+fn turn_neutral() -> std::result::Result<(), Box<(dyn std::error::Error + 'static)>> { // Roteert de Servo's naar zijn originele staat.
+    let mut pin22: OutputPin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
+    let mut pin27: OutputPin = Gpio::new()?.get(GPIO_PWM1)?.into_output();
+
     for pulse in (PULSE_MIN_US..=PULSE_NEUTRAL_US).step_by(10) {
-        pin.set_pwm(
+        pin22.set_pwm(
             Duration::from_millis(PERIOD_MS),
             Duration::from_micros(pulse),
         )?;
-        pin2.set_pwm(
+        pin27.set_pwm(
             Duration::from_millis(PERIOD_MS),
             Duration::from_micros(pulse),
         )?;
         thread::sleep(Duration::from_millis(20));
-
     }
-
     Ok(())
-
-    // When the pin variable goes out of scope, software-based PWM is automatically disabled.
-    // You can manually disable PWM by calling the clear_pwm() method.
 }
