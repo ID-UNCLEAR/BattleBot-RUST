@@ -8,12 +8,12 @@
 use std::error::Error;
 use std::thread;
 use std::time::Duration;
-use std::io::{stdin, stdout, Read, Stdin, Write};
+use std::io::{stdin, stdout, Write};
 
 //------------------------------
 // Rppal crate
 //------------------------------
-use rppal::gpio::{Gpio, Result, Pin, OutputPin};
+use rppal::gpio::{Gpio, OutputPin};
 
 //------------------------------
 // Termion crate
@@ -25,15 +25,15 @@ use termion::raw::IntoRawMode;
 //------------------------------
 // Constants
 //------------------------------
-const GPIO_PWM0: u8 = 22; // Fysieke pin:
-const GPIO_PWM1: u8 = 27; // Fysieke pin: 
+const GPIO_PWM0: u8 = 12; // Fysieke pin: 32
+const GPIO_PWM1: u8 = 13; // Fysieke pin: 33
 
 // Servo configuratie: 
 // !important: niet aanpassen.
-const PERIOD_MS: u64 = 10; // Periode: 100 Hz.
-const PULSE_MIN_US: u64 = 1000; // Pulse width min. 1000 µs (1000 microseconden)
+const PERIOD_MS: u64 = 20; // Periode: 100 Hz.
+const PULSE_MIN_US: u64 = 1200; // Pulse width min. 1000 µs (1000 microseconden)
 const PULSE_NEUTRAL_US: u64 = 1500; // Pulse width neutraal. 1500 µs (1500 microseconden)
-const PULSE_MAX_US: u64 = 2000; // Pulse width max. 2000 µs (2000 microseconden)
+const PULSE_MAX_US: u64 = 1800; // Pulse width max. 2000 µs (2000 microseconden)
 
 fn main() {
     let stdin = stdin();
@@ -54,33 +54,47 @@ fn main() {
         match character.unwrap() {
             Key::Char('w') => {
                 println!("W: Versnellen!");
-                accelerate().unwrap();
+                let speed: u64 = 1200;
+                accelerate(speed).unwrap();
             },
             Key::Char('s') => {
                 println!("S: Afremmen!");
-                deaccelerate().unwrap();
+                let speed: u64 = 1800;
+                deaccelerate(speed).unwrap();
             },
             Key::Char('a') => {
                 println!("A: Naar links!");
-                turn_left().unwrap();
+                let left: u64 = 1200;
+                let right : u64 = 1800;
+                turn_left(left, right).unwrap();
             },
             Key::Char('d') => {
                 println!("D: Naar rechts!");
-                turn_right().unwrap();
+                let left: u64 = 1800;
+                let right : u64 = 1200;
+                turn_right(left, right).unwrap();
             },
             Key::Alt('w') => {
                 println!("W: Überhard naar voor!");
-
+                let speed: u64 = 1000;
+                accelerate(speed).unwrap();
             },
             Key::Alt('s') => {
-                println!("W: Überhard naar achter!");
-
+                println!("S: Überhard naar achter!");
+                let speed: u64 = 2000;
+                deaccelerate(speed).unwrap();
             },
             Key::Alt('a') => {
+                let left: u64 = 2000;
+                let right: u64 = 1000;
                 println!("A: Überhard naar links!");
-
+                turn_left(left, right).unwrap();
             },
             Key::Alt('d') => {
+                let left: u64 = 1000;
+                let right: u64 = 2000;
+                println!("A: Überhard naar links!");
+                turn_right(left, right).unwrap();
                 println!("D: Überhard naar rechts!");
 
             },
@@ -103,19 +117,18 @@ fn main() {
     }
 }
 
-fn accelerate() -> std::result::Result<(), Box<dyn Error>> {    // Retrieve the GPIO pin and configure it as an output.
-
-    let mut pin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
-    let mut pin2 = Gpio::new()?.get(GPIO_PWM1)?.into_output();
+fn accelerate(speed: u64) -> std::result::Result<(), Box<dyn Error>> { // Retrieve the GPIO pin and configure it as an output.
+    let mut pin: OutputPin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
+    let mut pin2: OutputPin = Gpio::new()?.get(GPIO_PWM1)?.into_output();
 
     pin.set_pwm(
         Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(PULSE_MIN_US),
+        Duration::from_micros(speed),
     )?;
 
     pin2.set_pwm(
         Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(PULSE_MIN_US),
+        Duration::from_micros(speed),
     )?;
 
     thread::sleep(Duration::from_millis(25));
@@ -123,18 +136,18 @@ fn accelerate() -> std::result::Result<(), Box<dyn Error>> {    // Retrieve the 
     Ok(())
 }
 
-fn deaccelerate() -> std::result::Result<(), Box<dyn Error>>  {
-    let mut pin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
-    let mut pin2 = Gpio::new()?.get(GPIO_PWM1)?.into_output();
+fn deaccelerate(speed: u64) -> std::result::Result<(), Box<dyn Error>>  {
+    let mut pin: OutputPin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
+    let mut pin2: OutputPin = Gpio::new()?.get(GPIO_PWM1)?.into_output();
 
     pin.set_pwm(
         Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(PULSE_MAX_US),
+        Duration::from_micros(speed),
     )?;
 
     pin2.set_pwm(
         Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(PULSE_MAX_US),
+        Duration::from_micros(speed),
     )?;
 
     thread::sleep(Duration::from_millis(25));
@@ -142,21 +155,18 @@ fn deaccelerate() -> std::result::Result<(), Box<dyn Error>>  {
     Ok(())
 }
 
-fn turn_left() -> std::result::Result<(), Box<dyn Error>> {
-    let mut pin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
-    let mut pin2 = Gpio::new()?.get(GPIO_PWM1)?.into_output();
-
-    pin.set_low();
-    pin2.set_low();
+fn turn_left(left: u64, right: u64) -> std::result::Result<(), Box<dyn Error>> {
+    let mut pin: OutputPin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
+    let mut pin2: OutputPin = Gpio::new()?.get(GPIO_PWM1)?.into_output();
 
     pin.set_pwm(
         Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(PULSE_MIN_US),
+        Duration::from_micros(left),
     )?;
 
     pin2.set_pwm(
         Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(PULSE_MAX_US),
+        Duration::from_micros(right),
     )?;
 
     thread::sleep(Duration::from_millis(25));
@@ -164,21 +174,18 @@ fn turn_left() -> std::result::Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn turn_right() -> std::result::Result<(), Box<dyn Error>> {
-    let mut pin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
-    let mut pin2 = Gpio::new()?.get(GPIO_PWM1)?.into_output();
-
-    pin.set_low();
-    pin2.set_low();
+fn turn_right(left: u64, right: u64) -> std::result::Result<(), Box<dyn Error>> {
+    let mut pin: OutputPin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
+    let mut pin2: OutputPin = Gpio::new()?.get(GPIO_PWM1)?.into_output();
 
     pin.set_pwm(
         Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(PULSE_MAX_US),
+        Duration::from_micros(left),
     )?;
 
     pin2.set_pwm(
         Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(PULSE_MIN_US),
+        Duration::from_micros(right),
     )?;
 
     thread::sleep(Duration::from_millis(25));
