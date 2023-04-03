@@ -75,30 +75,28 @@ fn main() {
                 turn_right(left, right).unwrap();
             },
             Key::Alt('w') => {
-                println!("W: Überhard naar voor!");
+                println!("W: Extrahard naar voor!");
                 let speed: u64 = 1000;
                 accelerate(speed).unwrap();
             },
             Key::Alt('s') => {
-                println!("S: Überhard naar achter!");
+                println!("S: Extrahard naar achter!");
                 let speed: u64 = 2000;
                 deaccelerate(speed).unwrap();
             },
             Key::Alt('a') => {
+                println!("A: Extrahard naar links!");
                 let left: u64 = 2000;
                 let right: u64 = 1000;
-                println!("A: Überhard naar links!");
                 turn_left(left, right).unwrap();
             },
             Key::Alt('d') => {
+                println!("D: Extrahard naar rechts!");
                 let left: u64 = 1000;
                 let right: u64 = 2000;
-                println!("A: Überhard naar links!");
                 turn_right(left, right).unwrap();
-                println!("D: Überhard naar rechts!");
-
             },
-            Key::Esc => {
+            Key::Esc => { // Sluit het programma definitief af.
                 write!(
                     stdout,
                     "{}{}",
@@ -117,7 +115,26 @@ fn main() {
     }
 }
 
-fn accelerate(speed: u64) -> std::result::Result<(), Box<dyn Error>> { // Retrieve the GPIO pin and configure it as an output.
+fn accelerate(speed: u64) -> std::result::Result<(), Box<dyn Error>> { // Roteert beide wielen dezelfde kant op en gaat naar voren.
+    let mut pin: OutputPin = Gpio::new()?.get(GPIO_PWM0)?.into_output(); // Zet de GPIO-pin als outputpin, zodat een pwm gezet kan worden.
+    let mut pin2: OutputPin = Gpio::new()?.get(GPIO_PWM1)?.into_output();
+
+    pin.set_pwm(
+        Duration::from_millis(PERIOD_MS),
+        Duration::from_micros(speed),
+    )?;
+
+    pin2.set_pwm(
+        Duration::from_millis(PERIOD_MS),
+        Duration::from_micros(speed),
+    )?;
+
+    thread::sleep(Duration::from_millis(25)); // Slaapt de thread voor 25 milliseconden, zodat de pwm voor 25 ms actief blijft.
+
+    Ok(())
+}
+
+fn deaccelerate(speed: u64) -> std::result::Result<(), Box<dyn Error>>  { // Roteert beide wielen dezelfde kant op en gaat naar achter.
     let mut pin: OutputPin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
     let mut pin2: OutputPin = Gpio::new()?.get(GPIO_PWM1)?.into_output();
 
@@ -136,45 +153,7 @@ fn accelerate(speed: u64) -> std::result::Result<(), Box<dyn Error>> { // Retrie
     Ok(())
 }
 
-fn deaccelerate(speed: u64) -> std::result::Result<(), Box<dyn Error>>  {
-    let mut pin: OutputPin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
-    let mut pin2: OutputPin = Gpio::new()?.get(GPIO_PWM1)?.into_output();
-
-    pin.set_pwm(
-        Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(speed),
-    )?;
-
-    pin2.set_pwm(
-        Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(speed),
-    )?;
-
-    thread::sleep(Duration::from_millis(25));
-
-    Ok(())
-}
-
-fn turn_left(left: u64, right: u64) -> std::result::Result<(), Box<dyn Error>> {
-    let mut pin: OutputPin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
-    let mut pin2: OutputPin = Gpio::new()?.get(GPIO_PWM1)?.into_output();
-
-    pin.set_pwm(
-        Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(left),
-    )?;
-
-    pin2.set_pwm(
-        Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(right),
-    )?;
-
-    thread::sleep(Duration::from_millis(25));
-
-    Ok(())
-}
-
-fn turn_right(left: u64, right: u64) -> std::result::Result<(), Box<dyn Error>> {
+fn turn_left(left: u64, right: u64) -> std::result::Result<(), Box<dyn Error>> { // Roteer beide wielen andere kant op en gaat naar links.
     let mut pin: OutputPin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
     let mut pin2: OutputPin = Gpio::new()?.get(GPIO_PWM1)?.into_output();
 
@@ -193,11 +172,30 @@ fn turn_right(left: u64, right: u64) -> std::result::Result<(), Box<dyn Error>> 
     Ok(())
 }
 
-fn turn_neutral() -> std::result::Result<(), Box<(dyn std::error::Error + 'static)>> { // Roteert de Servo's naar zijn originele staat.
+fn turn_right(left: u64, right: u64) -> std::result::Result<(), Box<dyn Error>> { // Roteer beide wielen andere kant op en gaat naar rechts.
+    let mut pin: OutputPin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
+    let mut pin2: OutputPin = Gpio::new()?.get(GPIO_PWM1)?.into_output();
+
+    pin.set_pwm(
+        Duration::from_millis(PERIOD_MS),
+        Duration::from_micros(left),
+    )?;
+
+    pin2.set_pwm(
+        Duration::from_millis(PERIOD_MS),
+        Duration::from_micros(right),
+    )?;
+
+    thread::sleep(Duration::from_millis(25));
+
+    Ok(())
+}
+
+fn turn_neutral() -> std::result::Result<(), Box<(dyn std::error::Error + 'static)>> { // Roteert de Servo's naar hun originele staat.
     let mut pin22: OutputPin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
     let mut pin27: OutputPin = Gpio::new()?.get(GPIO_PWM1)?.into_output();
 
-    for pulse in (PULSE_MIN_US..=PULSE_NEUTRAL_US).step_by(10) {
+    for pulse in (PULSE_MIN_US..=PULSE_NEUTRAL_US).step_by(10) { // Rekent de benodigde pulse uit en zet vervolgens de wielen naar hun originele staat.
         pin22.set_pwm(
             Duration::from_millis(PERIOD_MS),
             Duration::from_micros(pulse),
