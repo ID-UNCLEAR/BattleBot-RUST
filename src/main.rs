@@ -5,14 +5,14 @@
 // Main Rust crate
 //------------------------------
 use std::error::Error;
+use std::io::{stdin, stdout, Write};
 use std::thread;
 use std::time::Duration;
-use std::io::{stdin, stdout, Write};
 
 //------------------------------
 // Rppal crate
 //------------------------------
-use rppal::gpio::{Gpio, OutputPin};
+use rppal::pwm::{Channel, Polarity, Pwm};
 
 //------------------------------
 // Termion crate
@@ -21,24 +21,43 @@ use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 
-//------------------------------
-// Constanten
-//------------------------------
-const GPIO_PWM0: u8 = 12; // Fysieke pin: 32
-const GPIO_PWM1: u8 = 13; // Fysieke pin: 33
-
-// Servo configuratie: 
+// Servo configuratie:
 // !important: niet aanpassen.
 const PERIOD_MS: u64 = 20; // Periode: 100 Hz.
-const PULSE_MIN_US: u64 = 1200; // Pulse width min. 1000 µs (1000 microseconden)
-const PULSE_NEUTRAL_US: u64 = 1500; // Pulse width neutraal. 1500 µs (1500 microseconden)
-const PULSE_MAX_US: u64 = 1800; // Pulse width max. 2000 µs (2000 microseconden)
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
+    let pulse_min_us: u64 = 1200;
+    // Pulse width min. 1000 µs (1000 microseconden)
+    let pulse_neutral_us: u64 = 1500;
+    // Pulse width neutraal. 1500 µs (1500 microseconden)
+    let pulse_max_us: u64 = 1800;
+    // Pulse width max. 2000 µs (2000 microseconden)
+
+    let pwm: Pwm = Pwm::with_period(
+        Channel::Pwm0,
+        Duration::from_millis(PERIOD_MS),
+        Duration::from_micros(pulse_max_us),
+        Polarity::Normal,
+        true,
+    )?;
+    let pwm1: Pwm = Pwm::with_period(
+        Channel::Pwm1,
+        Duration::from_millis(PERIOD_MS),
+        Duration::from_micros(pulse_max_us),
+        Polarity::Normal,
+        true,
+    )?;
+
     let stdin = stdin();
     let mut stdout = stdout().into_raw_mode().unwrap();
 
-    write!(stdout, r#"{}{} Druk op Esc om af te sluiten."#, termion::cursor::Goto(1, 1), termion::clear::All).unwrap();
+    write!(
+        stdout,
+        r#"{}{} Druk op Esc om af te sluiten."#,
+        termion::cursor::Goto(1, 1),
+        termion::clear::All
+    )
+    .unwrap();
     stdout.flush().unwrap();
 
     for character in stdin.keys() {
@@ -53,165 +72,93 @@ fn main() {
         match character.unwrap() {
             Key::Char('w') => {
                 println!("W: Versnellen!");
-                let speed: u64 = 1200;
-                accelerate(speed).unwrap();
-            },
+                movement(&pwm, &pwm1, pulse_max_us, pulse_max_us).unwrap();
+            }
             Key::Char('s') => {
                 println!("S: Afremmen!");
-                let speed: u64 = 1800;
-                deaccelerate(speed).unwrap();
-            },
+                movement(&pwm, &pwm1, pulse_min_us, pulse_min_us).unwrap();
+            }
             Key::Char('a') => {
-                println!("A: Naar links!");
-                let left: u64 = 1200;
-                let right : u64 = 1800;
-                turn_left(left, right).unwrap();
-            },
+                println!("A: Links!");
+                movement(&pwm, &pwm1, pulse_min_us, pulse_max_us).unwrap();
+            }
             Key::Char('d') => {
-                println!("D: Naar rechts!");
-                let left: u64 = 1800;
-                let right : u64 = 1200;
-                turn_right(left, right).unwrap();
-            },
+                println!("D: Rechts!");
+                movement(&pwm, &pwm1, pulse_max_us, pulse_min_us).unwrap();
+            }
             Key::Alt('w') => {
-                println!("W: Extrahard naar voor!");
-                let speed: u64 = 1000;
-                accelerate(speed).unwrap();
-            },
+                let speed: u64 = pulse_max_us + 200;
+                println!("W: Extrahard versnellen!");
+                movement(&pwm, &pwm1, speed, speed).unwrap();
+            }
             Key::Alt('s') => {
-                println!("S: Extrahard naar achter!");
-                let speed: u64 = 2000;
-                deaccelerate(speed).unwrap();
-            },
+                let speed: u64 = pulse_min_us - 200;
+                println!("S: Extrahard afremmen!");
+                movement(&pwm, &pwm1, speed, speed).unwrap();
+            }
             Key::Alt('a') => {
-                println!("A: Extrahard naar links!");
-                let left: u64 = 2000;
-                let right: u64 = 1000;
-                turn_left(left, right).unwrap();
-            },
+                let speed_left: u64 = pulse_min_us - 200;
+                let speed_right: u64 = pulse_max_us + 200;
+                println!("A: Extrahard links!");
+                movement(&pwm, &pwm1, speed_left, speed_right).unwrap();
+            }
             Key::Alt('d') => {
-                println!("D: Extrahard naar rechts!");
-                let left: u64 = 1000;
-                let right: u64 = 2000;
-                turn_right(left, right).unwrap();
+                let speed_left: u64 = pulse_max_us + 200;
+                let speed_right: u64 = pulse_min_us - 200;
+                println!("D: Extrahard rechts!");
+                movement(&pwm, &pwm1, speed_left, speed_right).unwrap();
             },
-            Key::Esc => { // Sluit het programma definitief af.
+            Key::BackTab => {
+                println!("Shift + Tab: Stil staan!");
+                movement(&pwm, &pwm1, 1, 1).unwrap();
+            },
+            Key::Esc => {
+                // Sluit het programma definitief af.
                 write!(
                     stdout,
                     "{}{}",
                     termion::cursor::Goto(1, 1),
                     termion::clear::All
-                ).unwrap();
+                )
+                .unwrap();
                 println!("Escaped the Matrix!");
-                turn_neutral().expect("Kon niet naar standaard!");
+                turn_neutral(&pwm, &pwm1, pulse_min_us, pulse_neutral_us).expect("Kon niet naar standaard!");
                 break;
-            },
+            }
             _ => {
                 println!("Druk op Esc om af te sluiten.");
-            },
+            }
         }
         stdout.flush().unwrap();
     }
-}
-
-fn accelerate(speed: u64) -> std::result::Result<(), Box<dyn Error>> { 
-    // Roteert beide wielen dezelfde kant op en gaat naar voren.
-    let mut pin: OutputPin = Gpio::new()?.get(GPIO_PWM0)?.into_output(); 
-    // Zet de GPIO-pin als outputpin, zodat een pwm gezet kan worden.
-    let mut pin2: OutputPin = Gpio::new()?.get(GPIO_PWM1)?.into_output();
-
-    pin.set_pwm(
-        Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(speed),
-    )?;
-
-    pin2.set_pwm(
-        Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(speed),
-    )?;
-
-    thread::sleep(Duration::from_millis(25)); 
-    // Slaapt de thread voor 25 milliseconden, zodat de pwm voor 25 ms actief blijft.
-
     Ok(())
 }
 
-fn deaccelerate(speed: u64) -> std::result::Result<(), Box<dyn Error>>  { 
-    // Roteert beide wielen dezelfde kant op en gaat naar achter.
-    let mut pin: OutputPin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
-    let mut pin2: OutputPin = Gpio::new()?.get(GPIO_PWM1)?.into_output();
-
-    pin.set_pwm(
-        Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(speed),
-    )?;
-
-    pin2.set_pwm(
-        Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(speed),
-    )?;
-
-    thread::sleep(Duration::from_millis(25));
-
+fn movement(
+    pwm: &Pwm, 
+    pwm1: &Pwm, 
+    pwm_pulse: u64, 
+    pwm1_pulse: u64
+) -> Result<(), Box<dyn Error>> {
+    pwm.set_pulse_width(Duration::from_micros(pwm_pulse))?;
+    pwm1.set_pulse_width(Duration::from_micros(pwm1_pulse))?;
     Ok(())
 }
 
-fn turn_left(left: u64, right: u64) -> std::result::Result<(), Box<dyn Error>> { 
-    // Roteer beide wielen andere kant op en gaat naar links.
-    let mut pin: OutputPin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
-    let mut pin2: OutputPin = Gpio::new()?.get(GPIO_PWM1)?.into_output();
-
-    pin.set_pwm(
-        Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(left),
-    )?;
-
-    pin2.set_pwm(
-        Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(right),
-    )?;
-
-    thread::sleep(Duration::from_millis(25));
-
-    Ok(())
-}
-
-fn turn_right(left: u64, right: u64) -> std::result::Result<(), Box<dyn Error>> { 
-    // Roteer beide wielen andere kant op en gaat naar rechts.
-    let mut pin: OutputPin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
-    let mut pin2: OutputPin = Gpio::new()?.get(GPIO_PWM1)?.into_output();
-
-    pin.set_pwm(
-        Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(left),
-    )?;
-
-    pin2.set_pwm(
-        Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(right),
-    )?;
-
-    thread::sleep(Duration::from_millis(25));
-
-    Ok(())
-}
-
-fn turn_neutral() -> std::result::Result<(), Box<(dyn std::error::Error + 'static)>> { 
+fn turn_neutral(
+    pwm: &Pwm,
+    pwm1: &Pwm,
+    pwm_min_pulse: u64,
+    pwm_neutral_pulse: u64,
+) -> std::result::Result<(), Box<(dyn std::error::Error + 'static)>> {
     // Roteert de Servo's naar hun originele staat.
-    let mut pin22: OutputPin = Gpio::new()?.get(GPIO_PWM0)?.into_output();
-    let mut pin27: OutputPin = Gpio::new()?.get(GPIO_PWM1)?.into_output();
-
-    for pulse in (PULSE_MIN_US..=PULSE_NEUTRAL_US).step_by(10) { 
+    for pulse in (pwm_min_pulse..=pwm_neutral_pulse).step_by(10) {
         // Rekent de benodigde pulse uit en zet vervolgens de wielen naar hun originele staat.
-        pin22.set_pwm(
-            Duration::from_millis(PERIOD_MS),
-            Duration::from_micros(pulse),
-        )?;
-        pin27.set_pwm(
-            Duration::from_millis(PERIOD_MS),
-            Duration::from_micros(pulse),
-        )?;
+        pwm.set_pulse_width(Duration::from_micros(pulse)).unwrap();
+        pwm1.set_pulse_width(Duration::from_micros(pulse)).unwrap();
         thread::sleep(Duration::from_millis(20));
     }
+    pwm.disable().expect("Kon pwm0 niet afsluiten.");
+    pwm1.disable().expect("Kon pwm1 niet afsluiten.");
     Ok(())
 }
