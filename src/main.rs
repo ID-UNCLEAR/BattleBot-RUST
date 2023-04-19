@@ -36,21 +36,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let pwm: Pwm = Pwm::with_period(
         Channel::Pwm0,
         Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(pulse_max_us),
+        Duration::from_micros(pulse_neutral_us),
         Polarity::Normal,
         true,
     )?;
     let pwm1: Pwm = Pwm::with_period(
         Channel::Pwm1,
         Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(pulse_max_us),
+        Duration::from_micros(pulse_neutral_us),
         Polarity::Normal,
         true,
     )?;
 
     let stdin = stdin();
     let mut stdout = stdout().into_raw_mode().unwrap();
-
     write!(
         stdout,
         r#"{}{} Druk op Esc om af te sluiten."#,
@@ -59,7 +58,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     )
     .unwrap();
     stdout.flush().unwrap();
-
     for character in stdin.keys() {
         // Klaart het scherm en zet de cursor op startpositie
         write!(
@@ -107,11 +105,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let speed_right: u64 = pulse_min_us - 200;
                 println!("D: Extrahard rechts!");
                 movement(&pwm, &pwm1, speed_left, speed_right).unwrap();
-            },
+            }
             Key::BackTab => {
                 println!("Shift + Tab: Stil staan!");
                 movement(&pwm, &pwm1, 1, 1).unwrap();
-            },
+            }
             Key::Esc => {
                 // Sluit het programma definitief af.
                 write!(
@@ -122,7 +120,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 )
                 .unwrap();
                 println!("Escaped the Matrix!");
-                turn_neutral(&pwm, &pwm1, pulse_min_us, pulse_neutral_us).expect("Kon niet naar standaard!");
+                turn_neutral(&pwm, &pwm1, pulse_min_us, pulse_neutral_us)
+                    .expect("Kon niet naar standaard!");
                 break;
             }
             _ => {
@@ -134,12 +133,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn movement(
-    pwm: &Pwm, 
-    pwm1: &Pwm, 
-    pwm_pulse: u64, 
-    pwm1_pulse: u64
-) -> Result<(), Box<dyn Error>> {
+fn movement(pwm: &Pwm, pwm1: &Pwm, pwm_pulse: u64, pwm1_pulse: u64) -> Result<(), Box<dyn Error>> {
     pwm.set_pulse_width(Duration::from_micros(pwm_pulse))?;
     pwm1.set_pulse_width(Duration::from_micros(pwm1_pulse))?;
     Ok(())
