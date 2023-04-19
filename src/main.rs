@@ -21,16 +21,22 @@ use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 
+//------------------------------
+// DS4
+//------------------------------
+use std::io::{BufRead, BufReader};
+use std::process::{Command, Stdio};
+
 // Servo configuratie:
 // !important: niet aanpassen.
 const PERIOD_MS: u64 = 20; // Periode: 100 Hz.
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let pulse_min_us: u64 = 1200;
+    let pulse_min_us: u64 = 1000;
     // Pulse width min. 1000 µs (1000 microseconden)
     let pulse_neutral_us: u64 = 1500;
     // Pulse width neutraal. 1500 µs (1500 microseconden)
-    let pulse_max_us: u64 = 1800;
+    let pulse_max_us: u64 = 2000;
     // Pulse width max. 2000 µs (2000 microseconden)
 
     let pwm: Pwm = Pwm::with_period(
@@ -47,94 +53,70 @@ fn main() -> Result<(), Box<dyn Error>> {
         Polarity::Normal,
         true,
     )?;
+    let mut cmd = Command::new("jstest");
+        cmd.arg("--event");
+        cmd.arg("/dev/input/js0");
+        cmd.stdout(Stdio::piped());
 
-    let stdin = stdin();
-    let mut stdout = stdout().into_raw_mode().unwrap();
-    write!(
-        stdout,
-        r#"{}{} Druk op Esc om af te sluiten."#,
-        termion::cursor::Goto(1, 1),
-        termion::clear::All
-    )
-    .unwrap();
-    stdout.flush().unwrap();
-    for character in stdin.keys() {
-        // Klaart het scherm en zet de cursor op startpositie
-        write!(
-            stdout,
-            "{}{}",
-            termion::cursor::Goto(1, 1),
-            termion::clear::All
-        )
-        .unwrap();
-        match character.unwrap() {
-            Key::Char('w') => {
-                println!("W: Versnellen!");
-                movement(&pwm, &pwm1, pulse_max_us, pulse_max_us).unwrap();
-            }
-            Key::Char('s') => {
-                println!("S: Afremmen!");
-                movement(&pwm, &pwm1, pulse_min_us, pulse_min_us).unwrap();
-            }
-            Key::Char('a') => {
-                println!("A: Links!");
-                movement(&pwm, &pwm1, pulse_min_us, pulse_max_us).unwrap();
-            }
-            Key::Char('d') => {
-                println!("D: Rechts!");
-                movement(&pwm, &pwm1, pulse_max_us, pulse_min_us).unwrap();
-            }
-            Key::Alt('w') => {
-                let speed: u64 = pulse_max_us + 200;
-                println!("W: Extrahard versnellen!");
-                movement(&pwm, &pwm1, speed, speed).unwrap();
-            }
-            Key::Alt('s') => {
-                let speed: u64 = pulse_min_us - 200;
-                println!("S: Extrahard afremmen!");
-                movement(&pwm, &pwm1, speed, speed).unwrap();
-            }
-            Key::Alt('a') => {
-                let speed_left: u64 = pulse_min_us - 200;
-                let speed_right: u64 = pulse_max_us + 200;
-                println!("A: Extrahard links!");
-                movement(&pwm, &pwm1, speed_left, speed_right).unwrap();
-            }
-            Key::Alt('d') => {
-                let speed_left: u64 = pulse_max_us + 200;
-                let speed_right: u64 = pulse_min_us - 200;
-                println!("D: Extrahard rechts!");
-                movement(&pwm, &pwm1, speed_left, speed_right).unwrap();
-            }
-            Key::BackTab => {
-                println!("Shift + Tab: Stil staan!");
-                movement(&pwm, &pwm1, 1, 1).unwrap();
-            }
-            Key::Esc => {
-                // Sluit het programma definitief af.
-                write!(
-                    stdout,
-                    "{}{}",
-                    termion::cursor::Goto(1, 1),
-                    termion::clear::All
-                )
-                .unwrap();
-                println!("Escaped the Matrix!");
-                turn_neutral(&pwm, &pwm1, pulse_min_us, pulse_neutral_us)
-                    .expect("Kon niet naar standaard!");
-                break;
-            }
-            _ => {
-                println!("Druk op Esc om af te sluiten.");
-            }
+    let mut child = cmd.spawn()?;
+    let stdout = child.stdout.take().ok_or("failed to capture stdout")?;
+    let reader = BufReader::new(stdout);
+
+    for line in reader.lines() {
+        let line = line?;
+        let parts: Vec<&str> = line.split(", ").collect();
+
+        let event_type = match parts[0].split(": ").nth(1) {
+            Some(s) => match s.split(" ").nth(1) {
+                Some(t) => t,
+                None => continue,
+            },
+            None => continue,
+        };
+        let number = match parts[2].split(" ").nth(1) {
+            Some(n) => n,
+            None => continue,
+        };
+        let value = match parts[3].split(" ").nth(1) {
+            Some(v) => v,
+            None => continue,
+        };
+
+        let event_type = event_type.parse::<i32>().unwrap();
+        let number = number.parse::<i32>().unwrap();
+        let value = value.parse::<u64>().unwrap();
+
+        if event_type == 2 && number == 1 {
+            speed_calc(value);
+            left_movement(&pwm, value).unwrap();
+            println!("Nummer: {}", number);
+            
+        } else if event_type == 2 && number == 4 {
+            speed_calc(value);
+            right_movement(&pwm1, value).unwrap();
+            println!("Nummer: {}", number);
         }
-        stdout.flush().unwrap();
+        else if event_type == 1 && number == 9 {
+            turn_neutral(&pwm, &pwm1, pulse_min_us, pulse_neutral_us).unwrap();
+            println!("Stopped");
+            break;
+        }
     }
     Ok(())
 }
 
-fn movement(pwm: &Pwm, pwm1: &Pwm, pwm_pulse: u64, pwm1_pulse: u64) -> Result<(), Box<dyn Error>> {
+fn right_movement(
+    pwm: &Pwm, 
+    pwm_pulse: u64,
+) -> Result<(), Box<dyn Error>> {
     pwm.set_pulse_width(Duration::from_micros(pwm_pulse))?;
+    Ok(())
+}
+
+fn left_movement(
+    pwm1: &Pwm, 
+    pwm1_pulse: u64
+) -> Result<(), Box<dyn Error>> {
     pwm1.set_pulse_width(Duration::from_micros(pwm1_pulse))?;
     Ok(())
 }
@@ -155,4 +137,9 @@ fn turn_neutral(
     pwm.disable().expect("Kon pwm0 niet afsluiten.");
     pwm1.disable().expect("Kon pwm1 niet afsluiten.");
     Ok(())
+}
+
+fn speed_calc(value: u64) {
+    let result = ((value as f32 / -32767.0) * 500.0) + 1500.0;
+    println!("{}", result.floor());
 }
