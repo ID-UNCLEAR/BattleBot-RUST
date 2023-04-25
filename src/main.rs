@@ -26,14 +26,6 @@ use termion::clear::All;
 use termion::cursor::Goto;
 
 //------------------------------
-<<<<<<< HEAD
-=======
-// DS4
-//------------------------------
-use std::io::{BufRead, BufReader};
-use std::process::{Command, Stdio};
-
->>>>>>> a64f521 (DS4 Rust control bot)
 // Servo configuratie:
 //------------------------------
 // !important: NIET AANPASSEN.
@@ -47,31 +39,16 @@ const PULSE_MAX_US: u64 = 2000;
 // Pulse width max. 2000 µs (2000 microseconden)
 
 fn main() -> Result<(), Box<dyn Error>> {
-<<<<<<< HEAD
     let pwm: Pwm = Pwm::with_period(
         Channel::Pwm0,
         Duration::from_millis(PERIOD_MS),
         Duration::from_micros(PULSE_NEUTRAL_US),
-=======
-    let pulse_min_us: u64 = 1000;
-    // Pulse width min. 1000 µs (1000 microseconden)
-    let pulse_neutral_us: u64 = 1500;
-    // Pulse width neutraal. 1500 µs (1500 microseconden)
-    let pulse_max_us: u64 = 2000;
-    // Pulse width max. 2000 µs (2000 microseconden)
-
-    let pwm: Pwm = Pwm::with_period(
-        Channel::Pwm0,
-        Duration::from_millis(PERIOD_MS),
-        Duration::from_micros(pulse_neutral_us),
->>>>>>> a64f521 (DS4 Rust control bot)
         Polarity::Normal,
         true,
     )?;
     let pwm1: Pwm = Pwm::with_period(
         Channel::Pwm1,
         Duration::from_millis(PERIOD_MS),
-<<<<<<< HEAD
         Duration::from_micros(PULSE_NEUTRAL_US),
         Polarity::Normal,
         true,
@@ -90,50 +67,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         let parts: Vec<&str> = line.split(", ").collect();
 
         let event_type: &str = match parts[0].split(": ").nth(1) {
-=======
-        Duration::from_micros(pulse_neutral_us),
-        Polarity::Normal,
-        true,
-    )?;
-    let mut cmd = Command::new("jstest");
-        cmd.arg("--event");
-        cmd.arg("/dev/input/js0");
-        cmd.stdout(Stdio::piped());
-
-    let mut child = cmd.spawn()?;
-    let stdout = child.stdout.take().ok_or("failed to capture stdout")?;
-    let reader = BufReader::new(stdout);
-
-    for line in reader.lines() {
-        let line = line?;
-        let parts: Vec<&str> = line.split(", ").collect();
-
-        let event_type = match parts[0].split(": ").nth(1) {
->>>>>>> a64f521 (DS4 Rust control bot)
             Some(s) => match s.split(" ").nth(1) {
                 Some(t) => t,
                 None => continue,
             },
             None => continue,
         };
-<<<<<<< HEAD
         let number: &str = match parts[2].split(" ").nth(1) {
             Some(n) => n,
             None => continue,
         };
         let value: &str = match parts[3].split(" ").nth(1) {
-=======
-        let number = match parts[2].split(" ").nth(1) {
-            Some(n) => n,
-            None => continue,
-        };
-        let value = match parts[3].split(" ").nth(1) {
->>>>>>> a64f521 (DS4 Rust control bot)
             Some(v) => v,
             None => continue,
         };
 
-<<<<<<< HEAD
         let event_type: i32 = event_type.parse::<i32>().unwrap();
         // Event type 1 of 2
         // 1 = Buttons
@@ -185,53 +133,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                     println!("Druk op Options om te stoppen.");
                 }
             }
-=======
-        let event_type = event_type.parse::<i32>().unwrap();
-        let number = number.parse::<i32>().unwrap();
-        let value = value.parse::<u64>().unwrap();
-
-        if event_type == 2 && number == 1 {
-            speed_calc(value);
-            left_movement(&pwm, value).unwrap();
-            println!("Nummer: {}", number);
-            
-        } else if event_type == 2 && number == 4 {
-            speed_calc(value);
-            right_movement(&pwm1, value).unwrap();
-            println!("Nummer: {}", number);
-        }
-        else if event_type == 1 && number == 9 {
-            turn_neutral(&pwm, &pwm1, pulse_min_us, pulse_neutral_us).unwrap();
-            println!("Stopped");
-            break;
->>>>>>> a64f521 (DS4 Rust control bot)
         }
     }
     Ok(())
 }
 
-<<<<<<< HEAD
 fn right_movement(pwm: &Pwm, pwm_pulse: u64) -> Result<(), Box<dyn Error>> {
     // Zet de PWM voor de rechter servo motor.
-=======
-fn right_movement(
-    pwm: &Pwm, 
-    pwm_pulse: u64,
-) -> Result<(), Box<dyn Error>> {
->>>>>>> a64f521 (DS4 Rust control bot)
     pwm.set_pulse_width(Duration::from_micros(pwm_pulse))?;
     Ok(())
 }
 
-<<<<<<< HEAD
 fn left_movement(pwm1: &Pwm, pwm1_pulse: u64) -> Result<(), Box<dyn Error>> {
     // Zet de PWM voor de linker servo motor.
-=======
-fn left_movement(
-    pwm1: &Pwm, 
-    pwm1_pulse: u64
-) -> Result<(), Box<dyn Error>> {
->>>>>>> a64f521 (DS4 Rust control bot)
     pwm1.set_pulse_width(Duration::from_micros(pwm1_pulse))?;
     Ok(())
 }
@@ -250,16 +164,10 @@ fn turn_neutral(
     Ok(())
 }
 
-<<<<<<< HEAD
 fn speed_calc(value: i32) -> u64 {
     // Rekent de pulse width in microseconden uit met de value.
     // Value = -32767 / 32767
     let result: f32 = ((value as f32 / -32767.0) * 500.0) + 1500.0;
     let end_result: f32 = result.round();
     end_result as u64
-=======
-fn speed_calc(value: u64) {
-    let result = ((value as f32 / -32767.0) * 500.0) + 1500.0;
-    println!("{}", result.floor());
->>>>>>> a64f521 (DS4 Rust control bot)
 }
