@@ -98,16 +98,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     print!("{}{}", All, Goto(1, 1));
                     println!("Gestopt!");
                     turn_neutral(&pwm, &pwm1).unwrap();
-                    let mut script_active: bool = false;
-                    'active: loop {
-                        if number == 9 && value == 1 {
-                            script_active = true;
-                        }
-
-                        if script_active && number == 9 && value == 1 {
-                            break 'active;
-                        }
-                    }
+                    sleep(number, value);
                 }
                 _ => {
                     print!("{}{}", All, Goto(1, 1));
@@ -170,4 +161,18 @@ fn speed_calc(value: i32) -> u64 {
     let result: f32 = ((value as f32 / -32767.0) * 500.0) + 1500.0;
     let end_result: f32 = result.round();
     end_result as u64
+}
+
+fn sleep(number: i32, value: i32) -> i64 {
+    let mut script_active: bool = false;
+    'active: loop {
+        if number == 9 && value == 1 {
+            script_active = true;
+        }
+
+        if script_active && number == 9 && value == 1 {
+            let end_result: i64 = 1;
+            end_result;
+        }
+    }
 }
