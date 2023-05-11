@@ -39,6 +39,16 @@ const PULSE_MAX_US: u64 = 2000;
 // Pulse width max. 2000 µs (2000 microseconden)
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let mut exit_status: i32 = 1;
+    println!("Connecting...");
+    while exit_status != 0 {
+        let output = Command::new("bluetoothctl")
+                     .args(["connect", "98:B6:E9:B6:D4:F9"])
+                     .output()
+                     .expect("failed to execute process");
+        exit_status = output.status.code().unwrap_or(1);
+    }
+    println!("Connected sucsesfully");
     let pwm: Pwm = Pwm::with_period(
         Channel::Pwm0,
         Duration::from_millis(PERIOD_MS),
