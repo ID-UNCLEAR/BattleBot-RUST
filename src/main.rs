@@ -62,6 +62,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let stdout: ChildStdout = child.stdout.take().ok_or("Kon niet Stdout zetten.")?;
     let reader: BufReader<ChildStdout> = BufReader::new(stdout);
 
+    let mut state: i32 = 1;
+
     for line in reader.lines() {
         let line: String = line?;
         let parts: Vec<&str> = line.split(", ").collect();
@@ -95,10 +97,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         if event_type == 1 {
             match number {
                 9 => {
-                    print!("{}{}", All, Goto(1, 1));
-                    println!("Gestopt!");
-                    turn_neutral(&pwm, &pwm1).unwrap();
-                    sleep(number, value);
+                    if value == 1 {
+                        print!("{}{}", All, Goto(1, 1));
+                        println!("Gestopt!");
+                        turn_neutral(&pwm, &pwm1).unwrap();
+                        state += 1;
+                         if state % 2 == 0 {
+                            println!("Gestopt in state: {state}");
+                            pwm.disable().expect("Kon PWM0 niet uitzetten.");
+                            pwm1.disable().expect("Kon PWM1 niet uitzetten.");
+                        } else {
+                            println!("Gestopt in state: {state}");
+                            pwm.enable().expect("Kon PWM0 niet aanzetten.");
+                            pwm1.enable().expect("Kon PWM1 niet aanzetten.");
+                        }
+                    } else {
+                        println!("Staat: {state}, Value: {value}");
+                    }
                 }
                 _ => {
                     print!("{}{}", All, Goto(1, 1));
@@ -161,18 +176,4 @@ fn speed_calc(value: i32) -> u64 {
     let result: f32 = ((value as f32 / -32767.0) * 500.0) + 1500.0;
     let end_result: f32 = result.round();
     end_result as u64
-}
-
-fn sleep(number: i32, value: i32) -> i64 {
-    let mut script_active: bool = false;
-    'active: loop {
-        if number == 9 && value == 1 {
-            script_active = true;
-        }
-
-        if script_active && number == 9 && value == 1 {
-            let end_result: i64 = 1;
-            end_result;
-        }
-    }
 }
