@@ -35,7 +35,7 @@ const PULSE_MIN_US: u64 = 1000;
 // Pulse width min. 1000 µs (1000 microseconden)
 const PULSE_NEUTRAL_US: u64 = 1500;
 // Pulse width neutraal. 1500 µs (1500 microseconden)
-const PULSE_MAX_US: u64 = 2000;
+const _PULSE_MAX_US: u64 = 2000;
 // Pulse width max. 2000 µs (2000 microseconden)
 
 fn main() -> Result<(), Box<dyn Error>> {
