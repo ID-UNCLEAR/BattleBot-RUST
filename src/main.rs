@@ -6,7 +6,7 @@
 //------------------------------
 use std::error::Error;
 use std::io::{BufRead, BufReader};
-use std::process::{Child, ChildStdout, Command, Stdio};
+use std::process::{Child, ChildStdout, Command, Output, Stdio};
 use std::thread;
 
 //------------------------------
@@ -40,15 +40,16 @@ const _PULSE_MAX_US: u64 = 2000;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut exit_status: i32 = 1;
-    println!("Connecting...");
+    let mac: &str = "98:B6:E9:B6:D4:F9";
+    println!("Connecting with {}", mac);
     while exit_status != 0 {
-        let output = Command::new("bluetoothctl")
-                     .args(["connect", "98:B6:E9:B6:D4:F9"])
-                     .output()
-                     .expect("failed to execute process");
+        let output: Output = Command::new("bluetoothctl")
+            .args(["connect", "98:B6:E9:B6:D4:F9"])
+            .output()
+            .expect("Failed to connect!");
         exit_status = output.status.code().unwrap_or(1);
     }
-    println!("Connected sucsesfully");
+    println!("Connected succesfully with {}", mac);
     let pwm: Pwm = Pwm::with_period(
         Channel::Pwm0,
         Duration::from_millis(PERIOD_MS),
@@ -112,7 +113,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         println!("Gestopt!");
                         turn_neutral(&pwm, &pwm1).unwrap();
                         state += 1;
-                         if state % 2 == 0 {
+                        if state % 2 == 0 {
                             println!("Gestopt in state: {state}");
                             pwm.disable().expect("Kon PWM0 niet uitzetten.");
                             pwm1.disable().expect("Kon PWM1 niet uitzetten.");
@@ -124,6 +125,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                     } else {
                         println!("Staat: {state}, Value: {value}");
                     }
+                }
+                8 => {
+                    print!("{}{}", All, Goto(1, 1));
+                    die();
                 }
                 _ => {
                     print!("{}{}", All, Goto(1, 1));
@@ -186,4 +191,14 @@ fn speed_calc(value: i32) -> u64 {
     let result: f32 = ((value as f32 / -32767.0) * 500.0) + 1500.0;
     let end_result: f32 = result.round();
     end_result as u64
+}
+
+fn die() {
+    let mut cmd: Command = Command::new("sudo");
+        cmd.arg("shutdown");
+        cmd.arg("-h");
+        cmd.arg("now");
+        cmd.stdout(Stdio::piped());
+        cmd.spawn().expect("Kon niet afsluiten.");
+    println!("Shutting down...");
 }
