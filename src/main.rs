@@ -152,7 +152,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         } else if event_type == 1 {
             match number {
                 0 => {
-                    toggle_relay();
+                    toggle_relay(17);
                 }
                 _ => { }
             }
@@ -195,16 +195,16 @@ fn speed_calc(value: i32) -> u64 {
     end_result as u64
 }
 
-fn toggle_relay(used_pin: i32) {
-    let mut pin = sysfs_gpio::Pin::new(used_pin);
-    pin.export().unwrap();
-    pin.set_direction(Direction::In).unwrap();
-    let value = pin.get_value().unwrap();
-    if value == 1 {
-        pin.set_direction(Direction::Out).unwrap();
-        pin.set_value(1).unwrap();
+// make a function that measures the current state of the relay and toggles it using pin.high or pin.low
+fn toggle_relay(pin: u8) {
+    let mut pin = match rppal::gpio::Gpio::new() {
+        Ok(gpio) => gpio.get(pin).unwrap().into_output(),
+        Err(e) => panic!("Error: {}", e),
+    };
+    let current_state = pin.is_set_high();
+    if current_state {
+        pin.set_low();
     } else {
-        pin.set_direction(Direction::Out).unwrap();
-        pin.set_value(0).unwrap();
+        pin.set_high();
     }
 }
