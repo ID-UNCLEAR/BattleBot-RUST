@@ -195,10 +195,16 @@ fn speed_calc(value: i32) -> u64 {
     end_result as u64
 }
 
-//function that toggles a relay by adjusting the GPIO pin
-fn toggle_relay() {
-    let mut pin = sysfs_gpio::Pin::new(17);
+fn toggle_relay(used_pin: i32) {
+    let mut pin = sysfs_gpio::Pin::new(used_pin);
     pin.export().unwrap();
-    pin.set_direction(Direction::Out).unwrap();
-    pin.set_value(1).unwrap();
+    pin.set_direction(Direction::In).unwrap();
+    let value = pin.get_value().unwrap();
+    if value == 1 {
+        pin.set_direction(Direction::Out).unwrap();
+        pin.set_value(1).unwrap();
+    } else {
+        pin.set_direction(Direction::Out).unwrap();
+        pin.set_value(0).unwrap();
+    }
 }
