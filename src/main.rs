@@ -107,7 +107,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         if event_type == 1 {
             match number {
                 9 => {
-                    if value == 1 {
+                    if value == 1 { // Options button
                         print!("{}{}", All, Goto(1, 1));
                         println!("Gestopt!");
                         turn_neutral(&pwm, &pwm1).unwrap();
@@ -132,13 +132,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         } else if event_type == 2 {
             match number {
-                1 => {
+                1 => { // Left joystick
                     print!("{}{}", All, Goto(1, 1));
                     let speed: u64 = speed_calc(value);
                     left_movement(&pwm, speed).unwrap();
                     println!("Nummer: {} en snelheid: {}", number, speed);
                 }
-                4 => {
+                4 => { // Right joystick
                     print!("{}{}", All, Goto(1, 1));
                     let speed: u64 = speed_calc(value);
                     right_movement(&pwm1, speed).unwrap();
@@ -148,6 +148,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                     print!("{}{}", All, Goto(1, 1));
                     println!("Druk op Options om te stoppen.");
                 }
+            }
+        } else if event_type == 1 {
+            match number {
+                0 => {
+                    toggle_relay();
+                }
+                _ => { }
             }
         }
     }
@@ -186,4 +193,12 @@ fn speed_calc(value: i32) -> u64 {
     let result: f32 = ((value as f32 / -32767.0) * 500.0) + 1500.0;
     let end_result: f32 = result.round();
     end_result as u64
+}
+
+//function that toggles a relay by adjusting the GPIO pin
+fn toggle_relay() {
+    let mut pin = sysfs_gpio::Pin::new(17);
+    pin.export().unwrap();
+    pin.set_direction(Direction::Out).unwrap();
+    pin.set_value(1).unwrap();
 }
