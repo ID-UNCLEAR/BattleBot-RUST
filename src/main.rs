@@ -18,6 +18,7 @@ use core::time::Duration;
 // Rppal crate
 //------------------------------
 use rppal::pwm::{Channel, Polarity, Pwm};
+use rppal::gpio::Gpio;
 
 //------------------------------
 // Termion crate
@@ -106,6 +107,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         if event_type == 1 {
             match number {
+                0 => {
+                    if value == 1 { // X button
+                        toggle_relay(21);
+                    } else {
+                        println!("Uitgedrukt");
+                    }
+                }
                 9 => {
                     if value == 1 { // Options button
                         print!("{}{}", All, Goto(1, 1));
@@ -149,13 +157,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                     println!("Druk op Options om te stoppen.");
                 }
             }
-        } else if event_type == 1 {
-            match number {
-                0 => {
-                    toggle_relay(17);
-                }
-                _ => { }
-            }
         }
     }
     Ok(())
@@ -196,15 +197,23 @@ fn speed_calc(value: i32) -> u64 {
 }
 
 // make a function that measures the current state of the relay and toggles it using pin.high or pin.low
-fn toggle_relay(pin: u8) {
-    let mut pin = match rppal::gpio::Gpio::new() {
-        Ok(gpio) => gpio.get(pin).unwrap().into_output(),
-        Err(e) => panic!("Error: {}", e),
-    };
-    let current_state = pin.is_set_high();
-    if current_state {
-        pin.set_low();
+fn toggle_relay(relay_pin: u8) {
+    // Initialiseer de GPIO
+    let gpio: Gpio = Gpio::new().unwrap();
+
+    // Configureer het pinnummer als uitvoer
+    let mut output_pin: rppal::gpio::OutputPin = gpio.get(relay_pin).unwrap().into_output();
+
+    let current_state: bool = output_pin.is_set_high();
+
+    if current_state == true {
+        // Schakel het relais uit
+        output_pin.set_low();
+        println!("Relais uitgeschakeld.");
     } else {
-        pin.set_high();
+        // Schakel het relais aan
+        output_pin.set_high();
+        println!("Relais ingeschakeld.");
+        thread::sleep(Duration::from_millis(1000));
     }
 }
