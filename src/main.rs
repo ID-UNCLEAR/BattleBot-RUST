@@ -18,7 +18,7 @@ use core::time::Duration;
 // Rppal crate
 //------------------------------
 use rppal::pwm::{Channel, Polarity, Pwm};
-use rppal::gpio::Gpio;
+use rppal::gpio::{Gpio, OutputPin};
 
 //------------------------------
 // Termion crate
@@ -39,14 +39,24 @@ const PULSE_NEUTRAL_US: u64 = 1500;
 const _PULSE_MAX_US: u64 = 2000;
 // Pulse width max. 2000 µs (2000 microseconden)
 
+// pin connected to the relay
+const relay_pin: u8 = 17;
+
 fn main() -> Result<(), Box<dyn Error>> {
+
+    // make the output pin with witch the relay is connected
+    let mut relay_output_pin = match rppal::gpio::Gpio::new() {
+        Ok(gpio) => gpio.get(relay_pin).unwrap().into_output(),
+        Err(e) => panic!("Error: {}", e),
+    };
+
     let mut exit_status: i32 = 1;
     println!("Connecting...");
     while exit_status != 0 {
         let output = Command::new("bluetoothctl")
-                     .args(["connect", "98:B6:E9:B6:D4:F9"])
-                     .output()
-                     .expect("failed to execute process");
+            .args(["connect", "98:B6:E9:B6:D4:F9"])
+            .output()
+            .expect("failed to execute process");
         exit_status = output.status.code().unwrap_or(1);
     }
     println!("Connected sucsesfully");
@@ -109,9 +119,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             match number {
                 0 => {
                     if value == 1 { // X button
-                        toggle_relay(21);
-                    } else {
-                        println!("Uitgedrukt");
+                        toggle_relay(&mut relay_output_pin);
                     }
                 }
                 9 => {
@@ -120,7 +128,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         println!("Gestopt!");
                         turn_neutral(&pwm, &pwm1).unwrap();
                         state += 1;
-                         if state % 2 == 0 {
+                        if state % 2 == 0 {
                             println!("Gestopt in state: {state}");
                             pwm.disable().expect("Kon PWM0 niet uitzetten.");
                             pwm1.disable().expect("Kon PWM1 niet uitzetten.");
@@ -197,13 +205,7 @@ fn speed_calc(value: i32) -> u64 {
 }
 
 // make a function that measures the current state of the relay and toggles it using pin.high or pin.low
-fn toggle_relay(relay_pin: u8) {
-    // Initialiseer de GPIO
-    let gpio: Gpio = Gpio::new().unwrap();
-
-    // Configureer het pinnummer als uitvoer
-    let mut output_pin: rppal::gpio::OutputPin = gpio.get(relay_pin).unwrap().into_output();
-
+fn toggle_relay(output_pin: &mut OutputPin) {
     let current_state: bool = output_pin.is_set_high();
 
     if current_state == true {
@@ -214,6 +216,5 @@ fn toggle_relay(relay_pin: u8) {
         // Schakel het relais aan
         output_pin.set_high();
         println!("Relais ingeschakeld.");
-        thread::sleep(Duration::from_millis(1000));
     }
 }
