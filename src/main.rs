@@ -18,6 +18,7 @@ use core::time::Duration;
 // Rppal crate
 //------------------------------  
 use rppal::pwm::{Channel, Polarity, Pwm};
+use rppal::gpio::{Gpio, OutputPin};
 
 //------------------------------
 // Termion crate
@@ -38,15 +39,25 @@ const PULSE_NEUTRAL_US: u64 = 1500;
 const _PULSE_MAX_US: u64 = 2000;
 // Pulse width max. 2000 µs (2000 microseconden)
 
+// pin connected to the relay
+const relay_pin: u8 = 17;
+
 fn main() -> Result<(), Box<dyn Error>> {
+
+    // make the output pin with witch the relay is connected
+    let mut relay_output_pin = match rppal::gpio::Gpio::new() {
+        Ok(gpio) => gpio.get(relay_pin).unwrap().into_output(),
+        Err(e) => panic!("Error: {}", e),
+    };
+
     let mut exit_status: i32 = 1;
     let mac: &str = "98:B6:E9:B6:D4:F9";
     println!("Connecting with {}", mac);
     while exit_status != 0 {
-        let output: Output = Command::new("bluetoothctl")
+        let output = Command::new("bluetoothctl")
             .args(["connect", "98:B6:E9:B6:D4:F9"])
             .output()
-            .expect("Failed to connect!");
+            .expect("failed to execute process");
         exit_status = output.status.code().unwrap_or(1);
     }
     println!("Connected succesfully with {}", mac);
@@ -107,8 +118,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         if event_type == 1 {
             match number {
+                0 => {
+                    if value == 1 { // X button
+                        toggle_relay(&mut relay_output_pin);
+                    }
+                }
                 9 => {
-                    if value == 1 {
+                    if value == 1 { // Options button
                         print!("{}{}", All, Goto(1, 1));
                         println!("Gestopt!");
                         turn_neutral(&pwm, &pwm1).unwrap();
@@ -137,13 +153,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         } else if event_type == 2 {
             match number {
-                1 => {
+                1 => { // Left joystick
                     print!("{}{}", All, Goto(1, 1));
                     let speed: u64 = speed_calc(value);
                     left_movement(&pwm, speed).unwrap();
                     println!("Nummer: {} en snelheid: {}", number, speed);
                 }
-                4 => {
+                4 => { // Right joystick
                     print!("{}{}", All, Goto(1, 1));
                     let speed: u64 = speed_calc(value);
                     right_movement(&pwm1, speed).unwrap();
@@ -193,12 +209,17 @@ fn speed_calc(value: i32) -> u64 {
     end_result as u64
 }
 
-fn die() {
-    let mut cmd: Command = Command::new("sudo");
-        cmd.arg("shutdown");
-        cmd.arg("-h");
-        cmd.arg("now");
-        cmd.stdout(Stdio::piped());
-        cmd.spawn().expect("Kon niet afsluiten.");
-    println!("Shutting down...");
+// make a function that measures the current state of the relay and toggles it using pin.high or pin.low
+fn toggle_relay(output_pin: &mut OutputPin) {
+    let current_state: bool = output_pin.is_set_high();
+
+    if current_state == true {
+        // Schakel het relais uit
+        output_pin.set_low();
+        println!("Relais uitgeschakeld.");
+    } else {
+        // Schakel het relais aan
+        output_pin.set_high();
+        println!("Relais ingeschakeld.");
+    }
 }
