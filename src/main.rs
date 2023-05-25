@@ -18,7 +18,7 @@ use core::time::Duration;
 // Rppal crate
 //------------------------------  
 use rppal::pwm::{Channel, Polarity, Pwm};
-use rppal::gpio::{Gpio, OutputPin};
+use rppal::gpio::{OutputPin};
 
 //------------------------------
 // Termion crate
@@ -40,13 +40,13 @@ const _PULSE_MAX_US: u64 = 2000;
 // Pulse width max. 2000 µs (2000 microseconden)
 
 // pin connected to the relay
-const relay_pin: u8 = 17;
+const RELAY_PIN: u8 = 17;
 
 fn main() -> Result<(), Box<dyn Error>> {
 
     // make the output pin with witch the relay is connected
     let mut relay_output_pin = match rppal::gpio::Gpio::new() {
-        Ok(gpio) => gpio.get(relay_pin).unwrap().into_output(),
+        Ok(gpio) => gpio.get(RELAY_PIN).unwrap().into_output(),
         Err(e) => panic!("Error: {}", e),
     };
 
@@ -54,7 +54,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mac: &str = "98:B6:E9:B6:D4:F9";
     println!("Connecting with {}", mac);
     while exit_status != 0 {
-        let output = Command::new("bluetoothctl")
+        let output: Output = Command::new("bluetoothctl")
             .args(["connect", "98:B6:E9:B6:D4:F9"])
             .output()
             .expect("failed to execute process");
@@ -207,6 +207,16 @@ fn speed_calc(value: i32) -> u64 {
     let result: f32 = ((value as f32 / -32767.0) * 500.0) + 1500.0;
     let end_result: f32 = result.round();
     end_result as u64
+}
+
+fn die() {
+    let mut cmd: Command = Command::new("sudo");
+        cmd.arg("shutdown");
+        cmd.arg("-h");
+        cmd.arg("now");
+        cmd.stdout(Stdio::piped());
+        cmd.spawn().expect("Kon niet afsluiten.");
+    println!("Shutting down...");
 }
 
 // make a function that measures the current state of the relay and toggles it using pin.high or pin.low
