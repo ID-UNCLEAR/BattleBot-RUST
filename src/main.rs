@@ -33,11 +33,11 @@ use termion::cursor::Goto;
 const PERIOD_MS: u64 = 20;
 // Periode: 100 Hz.
 const PULSE_MIN_US: u64 = 1000;
-// Pulse width min. 1000 µs (1000 microseconden)
+// Pulse width min. 1000 µs (1000 microseconds)
 const PULSE_NEUTRAL_US: u64 = 1500;
-// Pulse width neutraal. 1500 µs (1500 microseconden)
+// Pulse width neutraal. 1500 µs (1500 microseconds)
 const _PULSE_MAX_US: u64 = 2000;
-// Pulse width max. 2000 µs (2000 microseconden)
+// Pulse width max. 2000 µs (2000 microseconds)
 
 // pin connected to the relay
 const RELAY_PIN: u8 = 17;
@@ -130,6 +130,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let value: i32 = value.parse::<i32>().unwrap();
         // Values of the buttons. Values can be different based on the event type.
         // For more information please consult the jstest manual and the google drive.
+        // https://docs.google.com/document/d/1JimEC44Pfe6B-4K7RdRCUS34N6lFjGXUWc9UE84p6Wg/edit?usp=sharing
 
         if event_type == 1 {
             match number {
