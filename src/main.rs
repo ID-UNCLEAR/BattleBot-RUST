@@ -1,5 +1,5 @@
 // Main Rust file voor de battlebot.
-// Version: 0.2
+// Version: 1.0.0 5-6-2023
 
 //------------------------------
 // Main Rust crate
@@ -16,9 +16,9 @@ use core::time::Duration;
 
 //------------------------------
 // Rppal crate
-//------------------------------  
+//------------------------------
+use rppal::gpio::{OutputPin, Gpio};
 use rppal::pwm::{Channel, Polarity, Pwm};
-use rppal::gpio::{OutputPin};
 
 //------------------------------
 // Termion crate
@@ -27,9 +27,9 @@ use termion::clear::All;
 use termion::cursor::Goto;
 
 //------------------------------
-// Servo configuratie:
+// Servo configuration:
 //------------------------------
-// !important: NIET AANPASSEN.
+// !important: DON'T CHANGE.
 const PERIOD_MS: u64 = 20;
 // Periode: 100 Hz.
 const PULSE_MIN_US: u64 = 1000;
@@ -43,12 +43,11 @@ const _PULSE_MAX_US: u64 = 2000;
 const RELAY_PIN: u8 = 17;
 
 fn main() -> Result<(), Box<dyn Error>> {
-
-    // make the output pin with witch the relay is connected
-    let mut relay_output_pin = match rppal::gpio::Gpio::new() {
+    let mut relay_output_pin: OutputPin = match Gpio::new() {
         Ok(gpio) => gpio.get(RELAY_PIN).unwrap().into_output(),
         Err(e) => panic!("Error: {}", e),
     };
+    // Sets the relay pin to output and panics if it fails.
 
     let mut exit_status: i32 = 1;
     let mac: &str = "98:B6:E9:B6:D4:F9";
@@ -61,6 +60,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         exit_status = output.status.code().unwrap_or(1);
     }
     println!("Connected succesfully with {}", mac);
+    // Connects to the dualshock 4 controller with the given mac address.
+
     let pwm: Pwm = Pwm::with_period(
         Channel::Pwm0,
         Duration::from_millis(PERIOD_MS),
@@ -68,6 +69,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Polarity::Normal,
         true,
     )?;
+    // Initialises the first PWM channel (PWM0).
     let pwm1: Pwm = Pwm::with_period(
         Channel::Pwm1,
         Duration::from_millis(PERIOD_MS),
@@ -75,6 +77,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         Polarity::Normal,
         true,
     )?;
+    // Initialises the second PWM channel (PWM1).
+
     let mut cmd: Command = Command::new("jstest");
     cmd.arg("--event");
     cmd.arg("/dev/input/js0");
@@ -83,10 +87,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut child: Child = cmd.spawn()?;
     let stdout: ChildStdout = child.stdout.take().ok_or("Kon niet Stdout zetten.")?;
     let reader: BufReader<ChildStdout> = BufReader::new(stdout);
+    // Starts the jstest command and reads the output.
 
     let mut state: i32 = 1;
+    // State for the toggle of the PWM channels.
 
     for line in reader.lines() {
+        // Reads the output of the jstest command and collects the necessary data.
+
         let line: String = line?;
         let parts: Vec<&str> = line.split(", ").collect();
 
@@ -97,75 +105,87 @@ fn main() -> Result<(), Box<dyn Error>> {
             },
             None => continue,
         };
+        // Event type 1 or 2 based on the input.
+
         let number: &str = match parts[2].split(" ").nth(1) {
             Some(n) => n,
             None => continue,
         };
+        // Number of the button based on the event type.
+
         let value: &str = match parts[3].split(" ").nth(1) {
             Some(v) => v,
             None => continue,
         };
+        // Value of the button based on the event type and number.
 
         let event_type: i32 = event_type.parse::<i32>().unwrap();
-        // Event type 1 of 2
-        // 1 = Buttons
-        // 2 = Joysticks en L2/R2
+        /*
+            Event type 1 or 2
+            1 = Buttons
+            2 = Joysticks and L2/R2
+        */
         let number: i32 = number.parse::<i32>().unwrap();
-        // Nummer voor de knoppen. Nummers verschillen op basis van Event type.
+        // Numbers for the buttons. Numbers can be different based on the event type.
         let value: i32 = value.parse::<i32>().unwrap();
-        // Waardes van de knoppen. Waardes verschillen op basis van event type.
-        // Voor meer info kijk naar de Google Drive `Joystick`
+        // Values of the buttons. Values can be different based on the event type.
+        // For more information please consult the jstest manual and the google drive.
 
         if event_type == 1 {
             match number {
                 0 => {
-                    if value == 1 { // X button
+                    // X button toggles the relay.
+                    if value == 1 {
                         toggle_relay(&mut relay_output_pin);
                     }
                 }
+                8 => {
+                    // Share button shuts down the Raspberry Pi.
+                    print!("{}{}", All, Goto(1, 1));
+                    shutdown();
+                }
                 9 => {
-                    if value == 1 { // Options button
+                    // Options button pauses the script and turns the wheels to their original state.
+                    if value == 1 {
                         print!("{}{}", All, Goto(1, 1));
                         println!("Gestopt!");
                         turn_neutral(&pwm, &pwm1).unwrap();
                         state += 1;
                         if state % 2 == 0 {
-                            println!("Gestopt in state: {state}");
+                            // Disabled both PWM channels.
                             pwm.disable().expect("Kon PWM0 niet uitzetten.");
                             pwm1.disable().expect("Kon PWM1 niet uitzetten.");
                         } else {
-                            println!("Gestopt in state: {state}");
+                            // Enables both PWM channels.
                             pwm.enable().expect("Kon PWM0 niet aanzetten.");
                             pwm1.enable().expect("Kon PWM1 niet aanzetten.");
                         }
-                    } else {
-                        println!("Staat: {state}, Value: {value}");
                     }
                 }
-                8 => {
-                    print!("{}{}", All, Goto(1, 1));
-                    die();
-                }
                 _ => {
+                    // Fallback if none match.
                     print!("{}{}", All, Goto(1, 1));
                     println!("Druk op Options om te stoppen.");
                 }
             }
         } else if event_type == 2 {
             match number {
-                1 => { // Left joystick
+                1 => {
+                    // Left joystick to control the left servo motor.
                     print!("{}{}", All, Goto(1, 1));
                     let speed: u64 = speed_calc(value);
                     left_movement(&pwm, speed).unwrap();
                     println!("Nummer: {} en snelheid: {}", number, speed);
                 }
-                4 => { // Right joystick
+                4 => {
+                    // Right joystick to control the right servo motor.
                     print!("{}{}", All, Goto(1, 1));
                     let speed: u64 = speed_calc(value);
                     right_movement(&pwm1, speed).unwrap();
                     println!("Nummer: {} en snelheid: {}", number, speed);
                 }
                 _ => {
+                    // Fallback if none match.
                     print!("{}{}", All, Goto(1, 1));
                     println!("Druk op Options om te stoppen.");
                 }
@@ -175,14 +195,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn right_movement(pwm: &Pwm, pwm_pulse: u64) -> Result<(), Box<dyn Error>> {
-    // Zet de PWM voor de rechter servo motor.
+fn right_movement(
+    pwm: &Pwm, 
+    pwm_pulse: u64
+) -> Result<(), Box<dyn Error>> {
+    // Sets the PWM for the right servo motor.
     pwm.set_pulse_width(Duration::from_micros(pwm_pulse))?;
     Ok(())
 }
 
-fn left_movement(pwm1: &Pwm, pwm1_pulse: u64) -> Result<(), Box<dyn Error>> {
-    // Zet de PWM voor de linker servo motor.
+fn left_movement(
+    pwm1: &Pwm, 
+    pwm1_pulse: u64
+) -> Result<(), Box<dyn Error>> {
+    // Sets the PWM for the left servo motor.
     pwm1.set_pulse_width(Duration::from_micros(pwm1_pulse))?;
     Ok(())
 }
@@ -190,10 +216,10 @@ fn left_movement(pwm1: &Pwm, pwm1_pulse: u64) -> Result<(), Box<dyn Error>> {
 fn turn_neutral(
     pwm: &Pwm,
     pwm1: &Pwm,
-) -> std::result::Result<(), Box<(dyn std::error::Error + 'static)>> {
-    // Roteert de Servo's naar hun originele staat.
+) -> Result<(), Box<(dyn std::error::Error + 'static)>> {
+    // Rotates the wheels to their original state.
     for pulse in (PULSE_MIN_US..=PULSE_NEUTRAL_US).step_by(10) {
-        // Rekent de benodigde pulse uit en zet vervolgens de wielen naar hun originele staat.
+        // Calculates the pulse to turn the wheels to their original state.
         pwm.set_pulse_width(Duration::from_micros(pulse)).unwrap();
         pwm1.set_pulse_width(Duration::from_micros(pulse)).unwrap();
         thread::sleep(Duration::from_millis(20));
@@ -201,34 +227,37 @@ fn turn_neutral(
     Ok(())
 }
 
-fn speed_calc(value: i32) -> u64 {
-    // Rekent de pulse width in microseconden uit met de value.
-    // Value = -32767 / 32767
+fn speed_calc(
+    value: i32
+) -> u64 {
+    // Calculates the speed of the wheels with the given value.
+    // Value varies between -32767 and 32767 and the result will always be between 1000 and 2000.
     let result: f32 = ((value as f32 / -32767.0) * 500.0) + 1500.0;
     let end_result: f32 = result.round();
     end_result as u64
 }
 
-fn die() {
+fn shutdown() {
+    // Shutdown the Raspberry Pi.
     let mut cmd: Command = Command::new("sudo");
-        cmd.arg("shutdown");
-        cmd.arg("-h");
-        cmd.arg("now");
-        cmd.stdout(Stdio::piped());
-        cmd.spawn().expect("Kon niet afsluiten.");
+    cmd.args(["shutdown", "-h", "now"]);
+    cmd.stdout(Stdio::piped());
+    cmd.spawn().expect("Kon niet afsluiten.");
     println!("Shutting down...");
 }
 
-// make a function that measures the current state of the relay and toggles it using pin.high or pin.low
-fn toggle_relay(output_pin: &mut OutputPin) {
+fn toggle_relay(
+    output_pin: &mut OutputPin
+) {
+    // Toggle the relay.
     let current_state: bool = output_pin.is_set_high();
 
     if current_state == true {
-        // Schakel het relais uit
+        // Turns the relay off.
         output_pin.set_low();
         println!("Relais uitgeschakeld.");
     } else {
-        // Schakel het relais aan
+        // Turns the relay on.
         output_pin.set_high();
         println!("Relais ingeschakeld.");
     }
