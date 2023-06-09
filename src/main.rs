@@ -89,6 +89,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let reader: BufReader<ChildStdout> = BufReader::new(stdout);
     // Starts the jstest command and reads the output.
 
+    //set de default state of flipped to false
+    let mut flipped:bool = false;
+
     let mut state: i32 = 1;
     // State for the toggle of the PWM channels.
 
@@ -140,6 +143,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                         toggle_relay(&mut relay_output_pin);
                     }
                 }
+                3 => {
+                    if flipped == false {
+                        flipped = true
+                    } else {
+                        flipped = false
+                    }
+                }
                 8 => {
                     // Share button shuts down the Raspberry Pi.
                     print!("{}{}", All, Goto(1, 1));
@@ -174,14 +184,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 1 => {
                     // Left joystick to control the left servo motor.
                     print!("{}{}", All, Goto(1, 1));
-                    let speed: u64 = speed_calc(value);
+                    let speed: u64 = speed_calc(value, flipped);
                     left_movement(&pwm, speed).unwrap();
                     println!("Nummer: {} en snelheid: {}", number, speed);
                 }
                 4 => {
                     // Right joystick to control the right servo motor.
                     print!("{}{}", All, Goto(1, 1));
-                    let speed: u64 = speed_calc(value);
+                    let speed: u64 = speed_calc(value, flipped);
                     right_movement(&pwm1, speed).unwrap();
                     println!("Nummer: {} en snelheid: {}", number, speed);
                 }
@@ -228,12 +238,20 @@ fn turn_neutral(
     Ok(())
 }
 
-fn speed_calc(
-    value: i32
-) -> u64 {
+fn speed_calc(value: i32, flipped: bool) -> u64 {
     // Calculates the speed of the wheels with the given value.
     // Value varies between -32767 and 32767 and the result will always be between 1000 and 2000.
-    let result: f32 = ((value as f32 / -32767.0) * 500.0) + 1500.0;
+    let new_value:i32;
+
+    if flipped == true && value >=0 {
+        new_value = value * -1;
+    } else if flipped == true && value <0 {
+        new_value = value * -1;
+    } else {
+        new_value = value;
+    }
+
+    let result: f32 = ((new_value as f32 / -32767.0) * 500.0) + 1500.0;
     let end_result: f32 = result.round();
     end_result as u64
 }
