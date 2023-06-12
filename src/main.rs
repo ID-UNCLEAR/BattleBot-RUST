@@ -17,7 +17,7 @@ use core::time::Duration;
 //------------------------------
 // Rppal crate
 //------------------------------
-use rppal::gpio::{OutputPin, Gpio};
+use rppal::gpio::{Gpio, OutputPin};
 use rppal::pwm::{Channel, Polarity, Pwm};
 
 //------------------------------
@@ -70,6 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         true,
     )?;
     // Initialises the first PWM channel (PWM0).
+
     let pwm1: Pwm = Pwm::with_period(
         Channel::Pwm1,
         Duration::from_millis(PERIOD_MS),
@@ -90,7 +91,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Starts the jstest command and reads the output.
 
     //set de default state of flipped to false
-    let mut flipped:bool = false;
+    let mut flipped: bool = false;
 
     let mut state: i32 = 1;
     // State for the toggle of the PWM channels.
@@ -144,10 +145,15 @@ fn main() -> Result<(), Box<dyn Error>> {
                     }
                 }
                 3 => {
-                    if flipped == false {
-                        flipped = true
-                    } else {
-                        flipped = false
+                    if value == 1 {
+                        
+                        if flipped == false {
+                            flipped = true
+                        } else {
+                            flipped = false
+                        }
+
+                        println!("Flipped is now {}", flipped)
                     }
                 }
                 8 => {
@@ -206,28 +212,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn right_movement(
-    pwm: &Pwm, 
-    pwm_pulse: u64
-) -> Result<(), Box<dyn Error>> {
+fn right_movement(pwm: &Pwm, pwm_pulse: u64) -> Result<(), Box<dyn Error>> {
     // Sets the PWM for the right servo motor.
     pwm.set_pulse_width(Duration::from_micros(pwm_pulse))?;
     Ok(())
 }
 
-fn left_movement(
-    pwm1: &Pwm, 
-    pwm1_pulse: u64
-) -> Result<(), Box<dyn Error>> {
+fn left_movement(pwm1: &Pwm, pwm1_pulse: u64) -> Result<(), Box<dyn Error>> {
     // Sets the PWM for the left servo motor.
     pwm1.set_pulse_width(Duration::from_micros(pwm1_pulse))?;
     Ok(())
 }
 
-fn turn_neutral(
-    pwm: &Pwm,
-    pwm1: &Pwm,
-) -> Result<(), Box<(dyn std::error::Error + 'static)>> {
+fn turn_neutral(pwm: &Pwm, pwm1: &Pwm) -> Result<(), Box<(dyn std::error::Error + 'static)>> {
     // Rotates the wheels to their original state.
     for pulse in (PULSE_MIN_US..=PULSE_NEUTRAL_US).step_by(10) {
         // Calculates the pulse to turn the wheels to their original state.
@@ -241,11 +238,9 @@ fn turn_neutral(
 fn speed_calc(value: i32, flipped: bool) -> u64 {
     // Calculates the speed of the wheels with the given value.
     // Value varies between -32767 and 32767 and the result will always be between 1000 and 2000.
-    let new_value:i32;
+    let new_value: i32;
 
-    if flipped == true && value >=0 {
-        new_value = value * -1;
-    } else if flipped == true && value <0 {
+    if flipped == true {
         new_value = value * -1;
     } else {
         new_value = value;
@@ -265,9 +260,7 @@ fn shutdown() {
     println!("Shutting down...");
 }
 
-fn toggle_relay(
-    output_pin: &mut OutputPin
-) {
+fn toggle_relay(output_pin: &mut OutputPin) {
     // Toggle the relay.
     let current_state: bool = output_pin.is_set_high();
 
