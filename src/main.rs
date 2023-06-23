@@ -58,7 +58,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             .output()
             .expect("failed to execute process");
         exit_status = output.status.code().unwrap_or(1);
+        thread::sleep(Duration::from_millis(200));
     }
+
     println!("Connected succesfully with {}", mac);
     // Connects to the dualshock 4 controller with the given mac address.
 
